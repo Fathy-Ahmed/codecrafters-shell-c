@@ -9,13 +9,16 @@ int main(int argc, char *argv[])
   // Flush after every printf
   setbuf(stdout, NULL);
 
-  printf("$ ");
+  while (1)
+  {
+    printf("$ ");
+    fgets(command, sizeof(command), stdin);
 
-  fgets(command, sizeof(command), stdin);
+    // Remove the trailing newline
+    command[strcspn(command, "\n")] = '\0';
 
-  // Remove the trailing newline
-  command[strcspn(command, "\n")] = '\0';
+    printf("%s: command not found\n", command);
+  }
 
-  printf("%s: command not found\n", command);
   return 0;
 }
