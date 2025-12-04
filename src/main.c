@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     {
       char *rest = strtok(NULL, "");
       if (strcmp(rest, "exit") == 0 || strcmp(rest, "echo") == 0 || strcmp(rest, "type") == 0)
-        printf("%s: is a shell builtin\n", rest);
+        printf("%s is a shell builtin\n", rest);
       else
         printf("%s: not found\n", rest);
     }
