@@ -17,13 +17,24 @@ int main(int argc, char *argv[])
     // Remove the trailing newline
     command[strcspn(command, "\n")] = '\0';
 
+    char *cmd = strtok(command, " ");
+
     if (strcmp(command, "exit") == 0) // exit
       return 0;
 
     // else if (strcmp(strtok_r(command, " "), "echo") == 0) // Use strtok_r in multithreaded code.
-    else if (strcmp(strtok(command, " "), "echo") == 0) // echo
+    else if (strcmp(cmd, "echo") == 0) // echo
     {
       printf("%s\n", strtok(NULL, "")); // Continue from where you stopped last time.
+    }
+
+    else if (strcmp(cmd, "type") == 0) // type
+    {
+      char *rest = strtok(NULL, "");
+      if (strcmp(rest, "exit") == 0 || strcmp(rest, "echo") == 0 || strcmp(rest, "type") == 0)
+        printf("%s: is a shell builtin\n", rest);
+      else
+        printf("%s: not found\n", rest);
     }
 
     else
