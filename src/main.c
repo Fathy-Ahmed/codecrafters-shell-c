@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/wait.h>
 // #include "colors.h" // find it in "D:\" and use // #define PS1 BHGRN "$ " CRESET
 // #include "linenoise.h"
 
@@ -29,6 +30,13 @@ const char *PATH_SEP = ";"; // Windows
 #else
 const char *PATH_SEP = ":"; // Linux, macOS, Unix
 #endif
+
+// typedef enum
+// {
+//   CMD_EXIT,
+//   CMD_ECHO,
+//   CMD_TYPE
+// } ShellCommand;
 
 #define EXIT_CMD "exit"
 #define ECHO_CMD "echo"
@@ -127,6 +135,52 @@ void handle_type(char *rest)
   }
 }
 
+void run_external(char *exe_path, char *arguments)
+{
+  pid_t pid = fork(); // creates a child process that is an exact copy of the parent.
+  if (pid < 0)        // error (creation failed)
+  {
+    perror("fork");
+    return;
+  }
+
+  if (pid == 0) // Child process
+  {
+    // Build argv[] array for exec
+    char *args[64]; // max arguments
+    int i = 0;
+
+    // First argument must be the executable itself
+    args[i++] = (char *)exe_path;
+
+    if (arguments != NULL)
+    {
+      char *arg = strtok(arguments, " ");
+      while (arg != NULL && i < 63)
+      {
+        args[i++] = arg;
+        arg = strtok(NULL, " ");
+      }
+    }
+
+    args[i] = NULL; // exec requires a NULL-terminated array
+
+    execvp(exe_path, args);
+
+    // // If execvp returns, it FAILED
+    // perror("execvp");
+    // exit(1);
+  }
+  else // PARENT PROCESS → wait for child to finish
+  {
+    // The parent (your shell):
+    // waits for the child to finish
+    // does NOT run the external program itself
+    // only resumes printing $ after the program ends
+    waitpid(pid, NULL, 0);
+  }
+}
+
 int main(int argc, char *argv[])
 {
   // Flush after every printf
@@ -162,20 +216,31 @@ int main(int argc, char *argv[])
     strcpy(cmd_copy, command);
 
     char *cmd = strtok(cmd_copy, " ");
-    char *rest = strtok(NULL, ""); // Continue from where you stopped last time.
+    char *arguments = strtok(NULL, ""); // Continue from where you stopped last time.
 
     // if (strcmp(strtok_r(command, " "), "echo") == 0) // Use strtok_r in multithreaded code.
     if (cmd != NULL && strcmp(cmd, ECHO_CMD) == 0) // echo
     {
-      handle_echo(rest);
+      handle_echo(arguments);
     }
     else if (cmd != NULL && strcmp(cmd, TYPE_CMD) == 0) // type
     {
-      handle_type(rest);
+      handle_type(arguments);
     }
     else
     {
-      printf("%s: command not found\n", command);
+      char *exe_path = find_executable(cmd);
+      // Running External Programs
+      if (exe_path != NULL)
+      {
+        // system(command); // Insecure way to run external commands, Runs through /bin/sh, not the program directly
+        run_external(exe_path, arguments);
+        free(exe_path);
+      }
+      else
+      {
+        printf("%s: command not found\n", command);
+      }
     }
   }
 
