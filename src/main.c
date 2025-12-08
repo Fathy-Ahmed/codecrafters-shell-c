@@ -135,7 +135,7 @@ void handle_type(char *rest)
   }
 }
 
-void run_external(char *exe_path, char *arguments)
+void run_external(char *cmd, char *arguments)
 {
   pid_t pid = fork(); // creates a child process that is an exact copy of the parent.
   if (pid < 0)        // error (creation failed)
@@ -151,7 +151,7 @@ void run_external(char *exe_path, char *arguments)
     int i = 0;
 
     // First argument must be the executable itself
-    args[i++] = (char *)exe_path;
+    args[i++] = (char *)cmd;
 
     if (arguments != NULL)
     {
@@ -165,7 +165,7 @@ void run_external(char *exe_path, char *arguments)
 
     args[i] = NULL; // exec requires a NULL-terminated array
 
-    execvp(exe_path, args);
+    execvp(cmd, args);
 
     // // If execvp returns, it FAILED
     // perror("execvp");
@@ -234,7 +234,7 @@ int main(int argc, char *argv[])
       if (exe_path != NULL)
       {
         // system(command); // Insecure way to run external commands, Runs through /bin/sh, not the program directly
-        run_external(exe_path, arguments);
+        run_external(cmd, arguments);
         free(exe_path);
       }
       else
