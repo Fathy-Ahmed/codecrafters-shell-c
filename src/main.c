@@ -41,12 +41,13 @@ const char *PATH_SEP = ":"; // Linux, macOS, Unix
 #define EXIT_CMD "exit"
 #define ECHO_CMD "echo"
 #define TYPE_CMD "type"
+#define TYPE_PWD "pwd"
 #define PATH_EVN "PATH"
 
 #define MAX_COMMAND_LEN 1024
 #define MAX_PATH_LEN 4096
 
-const char *builtin[] = {EXIT_CMD, ECHO_CMD, TYPE_CMD};
+const char *builtin[] = {EXIT_CMD, ECHO_CMD, TYPE_CMD, TYPE_PWD};
 
 char *find_executable(char *command)
 {
@@ -135,6 +136,41 @@ void handle_type(char *rest)
   }
 }
 
+void handle_pwd()
+{
+  char cwd[4096];
+  if (getcwd(cwd, sizeof(cwd)) != NULL) // retrieves the absolute path of the current working directory.
+  {
+    printf("%s\n", cwd);
+  }
+  else
+  {
+    perror("getcwd");
+  }
+}
+
+void handle_builtin_command(char *cmd, char *arguments)
+{
+
+  // if (strcmp(strtok_r(command, " "), "echo") == 0) // Use strtok_r in multithreaded code.
+  if (strcmp(cmd, ECHO_CMD) == 0) // echo
+  {
+    handle_echo(arguments);
+  }
+  else if (strcmp(cmd, TYPE_CMD) == 0) // type
+  {
+    handle_type(arguments);
+  }
+  else if (strcmp(cmd, TYPE_PWD) == 0) // pwd
+  {
+    handle_pwd();
+  }
+  else // exit
+  {
+    exit(0);
+  }
+}
+
 void run_external(char *cmd, char *arguments)
 {
   pid_t pid = fork(); // creates a child process that is an exact copy of the parent.
@@ -190,9 +226,8 @@ int main(int argc, char *argv[])
   (void)argv;
 
   char command[MAX_COMMAND_LEN];
-  bool running = true;
 
-  while (running) // REPL (Read-Eval-Print Loop)
+  while (true) // REPL (Read-Eval-Print Loop)
   {
     printf(PS1);
 
@@ -206,30 +241,20 @@ int main(int argc, char *argv[])
     // Remove the trailing newline
     command[strcspn(command, "\n")] = '\0';
 
-    if (strcmp(command, EXIT_CMD) == 0) // exit
-    {
-      running = false;
-      continue;
-    }
-
     char cmd_copy[MAX_COMMAND_LEN];
     strcpy(cmd_copy, command);
 
     char *cmd = strtok(cmd_copy, " ");
     char *arguments = strtok(NULL, ""); // Continue from where you stopped last time.
 
-    // if (strcmp(strtok_r(command, " "), "echo") == 0) // Use strtok_r in multithreaded code.
-    if (cmd != NULL && strcmp(cmd, ECHO_CMD) == 0) // echo
+    if (is_builtin_command(cmd))
     {
-      handle_echo(arguments);
-    }
-    else if (cmd != NULL && strcmp(cmd, TYPE_CMD) == 0) // type
-    {
-      handle_type(arguments);
+      handle_builtin_command(cmd, arguments);
     }
     else
     {
       char *exe_path = find_executable(cmd);
+
       // Running External Programs
       if (exe_path != NULL)
       {
