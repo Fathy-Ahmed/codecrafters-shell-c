@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -42,12 +43,14 @@ const char *PATH_SEP = ":"; // Linux, macOS, Unix
 #define ECHO_CMD "echo"
 #define TYPE_CMD "type"
 #define TYPE_PWD "pwd"
+#define TYPE_CD "cd"
+
+const char *builtin[] = {EXIT_CMD, ECHO_CMD, TYPE_CMD, TYPE_PWD, TYPE_CD};
+
 #define PATH_EVN "PATH"
 
 #define MAX_COMMAND_LEN 1024
 #define MAX_PATH_LEN 4096
-
-const char *builtin[] = {EXIT_CMD, ECHO_CMD, TYPE_CMD, TYPE_PWD};
 
 char *find_executable(char *command)
 {
@@ -149,6 +152,26 @@ void handle_pwd()
   }
 }
 
+void handle_cd(char *path)
+{
+  if (path == NULL)
+  {
+    // Default: go to HOME directory
+    char *home = getenv("HOME");
+    if (home == NULL)
+      home = "/";
+    if (chdir(home) != 0)
+      perror("cd");
+    return;
+  }
+
+  if (chdir(path) != 0)
+  {
+    // errno is a global variable used in C to indicate what error happened when a system call or library function fails.
+    fprintf(stderr, "cd: %s: %s\n", path, strerror(errno)); // errno -> here = ENOENT (No such file or directory)
+  }
+}
+
 void handle_builtin_command(char *cmd, char *arguments)
 {
 
@@ -164,6 +187,10 @@ void handle_builtin_command(char *cmd, char *arguments)
   else if (strcmp(cmd, TYPE_PWD) == 0) // pwd
   {
     handle_pwd();
+  }
+  else if (strcmp(cmd, TYPE_CD) == 0) // pwd
+  {
+    handle_cd(arguments);
   }
   else // exit
   {
