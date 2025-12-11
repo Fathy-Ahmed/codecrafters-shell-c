@@ -188,7 +188,7 @@ void handle_builtin_command(char *cmd, char *arguments)
   {
     handle_pwd();
   }
-  else if (strcmp(cmd, TYPE_CD) == 0) // pwd
+  else if (strcmp(cmd, TYPE_CD) == 0) // cd
   {
     handle_cd(arguments);
   }
