@@ -165,7 +165,11 @@ void handle_cd(char *path)
     return;
   }
 
-  if (chdir(path) != 0)
+  if (strcmp(path, "~") == 0)
+  {
+    chdir(getenv("HOME"));
+  }
+  else if (chdir(path) != 0)
   {
     // errno is a global variable used in C to indicate what error happened when a system call or library function fails.
     fprintf(stderr, "cd: %s: %s\n", path, strerror(errno)); // errno -> here = ENOENT (No such file or directory)
