@@ -1,3 +1,15 @@
+/***************************************************************************/ /**
+
+    @file         main.c
+
+    @author       Fathy Ahmed
+
+    @date         Thursday,  8 January 2015
+
+    @brief        Shelly ()
+
+  *******************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +63,7 @@ const char *builtin[] = {EXIT_CMD, ECHO_CMD, TYPE_CMD, TYPE_PWD, TYPE_CD};
 
 #define MAX_COMMAND_LEN 1024
 #define MAX_PATH_LEN 4096
+#define MAX_ARGS 128
 
 char *find_executable(char *command)
 {
@@ -102,39 +115,37 @@ bool is_builtin_command(char *command)
   return ret;
 }
 
-void handle_echo(char *rest)
+void handle_echo(char **args)
 {
-  if (rest != NULL)
-    printf("%s\n", rest);
-  else
-    printf("\n");
+  for (int i = 1; args[i] != NULL; i++)
+  {
+    printf("%s ", args[i]);
+  }
+  printf("\n");
 }
 
-void handle_type(char *rest)
+void handle_type(char **args)
 {
-  if (rest == NULL)
+  for (int i = 1; args[i] != NULL; i++)
   {
-    printf("\n");
-    return;
-  }
+    bool is_builtin = is_builtin_command(args[i]);
 
-  bool is_builtin = is_builtin_command(rest);
-
-  if (is_builtin)
-  {
-    printf("%s is a shell builtin\n", rest);
-  }
-  else
-  {
-    char *exe_path = find_executable(rest);
-    if (exe_path != NULL)
+    if (is_builtin)
     {
-      printf("%s is %s\n", rest, exe_path);
-      free(exe_path);
+      printf("%s is a shell builtin\n", args[i]);
     }
     else
     {
-      printf("%s: not found\n", rest);
+      char *exe_path = find_executable(args[i]);
+      if (exe_path != NULL)
+      {
+        printf("%s is %s\n", args[i], exe_path);
+        free(exe_path);
+      }
+      else
+      {
+        printf("%s: not found\n", args[i]);
+      }
     }
   }
 }
@@ -152,8 +163,10 @@ void handle_pwd()
   }
 }
 
-void handle_cd(char *path)
+void handle_cd(char **args)
 {
+  char *path = args[1];
+
   if (path == NULL)
   {
     // Default: go to HOME directory
@@ -176,25 +189,24 @@ void handle_cd(char *path)
   }
 }
 
-void handle_builtin_command(char *cmd, char *arguments)
+void handle_builtin_command(char **args)
 {
-
   // if (strcmp(strtok_r(command, " "), "echo") == 0) // Use strtok_r in multithreaded code.
-  if (strcmp(cmd, ECHO_CMD) == 0) // echo
+  if (strcmp(args[0], ECHO_CMD) == 0) // echo
   {
-    handle_echo(arguments);
+    handle_echo(args);
   }
-  else if (strcmp(cmd, TYPE_CMD) == 0) // type
+  else if (strcmp(args[0], TYPE_CMD) == 0) // type
   {
-    handle_type(arguments);
+    handle_type(args);
   }
-  else if (strcmp(cmd, TYPE_PWD) == 0) // pwd
+  else if (strcmp(args[0], TYPE_PWD) == 0) // pwd
   {
     handle_pwd();
   }
-  else if (strcmp(cmd, TYPE_CD) == 0) // cd
+  else if (strcmp(args[0], TYPE_CD) == 0) // cd
   {
-    handle_cd(arguments);
+    handle_cd(args);
   }
   else // exit
   {
@@ -202,7 +214,7 @@ void handle_builtin_command(char *cmd, char *arguments)
   }
 }
 
-void run_external(char *cmd, char *arguments)
+void run_external(char **args)
 {
   pid_t pid = fork(); // creates a child process that is an exact copy of the parent.
   if (pid < 0)        // error (creation failed)
@@ -213,30 +225,13 @@ void run_external(char *cmd, char *arguments)
 
   if (pid == 0) // Child process
   {
-    // Build argv[] array for exec
-    char *args[64]; // max arguments
-    int i = 0;
 
-    // First argument must be the executable itself
-    args[i++] = (char *)cmd;
+    // CHILD
+    execvp(args[0], args);
 
-    if (arguments != NULL)
-    {
-      char *arg = strtok(arguments, " ");
-      while (arg != NULL && i < 63)
-      {
-        args[i++] = arg;
-        arg = strtok(NULL, " ");
-      }
-    }
-
-    args[i] = NULL; // exec requires a NULL-terminated array
-
-    execvp(cmd, args);
-
-    // // If execvp returns, it FAILED
-    // perror("execvp");
-    // exit(1);
+    // Only reached if execvp fails
+    perror("execvp");
+    exit(1);
   }
   else // PARENT PROCESS → wait for child to finish
   {
@@ -246,6 +241,64 @@ void run_external(char *cmd, char *arguments)
     // only resumes printing $ after the program ends
     waitpid(pid, NULL, 0);
   }
+}
+
+char **split_args(char *line)
+{
+  char **args = malloc(MAX_ARGS * sizeof(char *)); // max 64 arguments
+
+  bool is_single_quote = false;
+  bool is_double_quote = false;
+
+  int arg_index = 0;
+  char *p = line;
+  char *start = NULL;
+  while (*p)
+  {
+    // Skip spaces outside quotes
+    while (*p == ' ' && !is_single_quote && !is_double_quote)
+      p++;
+
+    if (*p == '\0')
+      break;
+
+    start = p;
+
+    while (*p)
+    {
+      if (*p == '\'' && !is_double_quote)
+      {
+        is_single_quote = !is_single_quote;
+        memmove(p, p + 1, strlen(p)); // remove quote
+        continue;
+      }
+
+      if (*p == '"' && !is_single_quote)
+      {
+        is_double_quote = !is_double_quote;
+        memmove(p, p + 1, strlen(p)); // remove quote
+        continue;
+      }
+
+      if (*p == ' ' && !is_single_quote && !is_double_quote)
+        break;
+
+      p++;
+    }
+    if (*p)
+    {
+      *p = '\0';
+      p++;
+    }
+
+    args[arg_index++] = start;
+
+    if (arg_index >= 63)
+      break;
+  }
+
+  args[arg_index] = NULL;
+  return args;
 }
 
 int main(int argc, char *argv[])
@@ -272,25 +325,27 @@ int main(int argc, char *argv[])
     // Remove the trailing newline
     command[strcspn(command, "\n")] = '\0';
 
-    char cmd_copy[MAX_COMMAND_LEN];
-    strcpy(cmd_copy, command);
+    char **args = split_args(command);
 
-    char *cmd = strtok(cmd_copy, " ");
-    char *arguments = strtok(NULL, ""); // Continue from where you stopped last time.
-
-    if (is_builtin_command(cmd))
+    if (args[0] == NULL)
     {
-      handle_builtin_command(cmd, arguments);
+      free(args);
+      continue;
+    }
+
+    if (is_builtin_command(args[0]))
+    {
+      handle_builtin_command(args);
     }
     else
     {
-      char *exe_path = find_executable(cmd);
+      char *exe_path = find_executable(args[0]);
 
       // Running External Programs
       if (exe_path != NULL)
       {
         // system(command); // Insecure way to run external commands, Runs through /bin/sh, not the program directly
-        run_external(cmd, arguments);
+        run_external(args);
         free(exe_path);
       }
       else
